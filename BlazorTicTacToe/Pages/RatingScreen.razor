@@ -1,0 +1,208 @@
+﻿@page "/rating"
+
+@using BlazorTicTacToe.Data
+
+@inject IStatsService _statsService;
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    table {
+        display: grid;
+        border-collapse: collapse;
+        min-width: 100%;
+    }
+
+    thead,
+    tbody,
+    tr {
+        display: contents;
+    }
+
+    th,
+    td {
+        padding: 15px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    th {
+        position: sticky;
+        top: 0;
+        background: #6c7ae0;
+        text-align: left;
+        font-weight: normal;
+        font-size: 1.1rem;
+        color: white;
+    }
+
+    th:last-child {
+        border: 0;
+    }
+
+    td {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        color: #808080;
+    }
+
+    tr:nth-child(even) td {
+        background: #f8f6ff;
+    }
+
+    div.filterblock {
+        display: inline-block;
+    }
+
+    div.filterblock > div {
+        margin: 5px;
+    }
+
+    div.filterblock > div > label {
+        width: 150px;
+    }
+
+    div.filterblock > div > input[type="checkbox"] {
+        margin: 8px;
+    }
+
+    div.filterblock > p {
+        width: auto;
+        text-align: center;
+        font-weight: bold;
+    }
+</style>
+
+<h3>Рейтинг игроков</h3>
+
+<div class="filterblock">
+    <p>Фильтры</p>
+    <div>
+        <label>Имя игрока</label>
+        <input type="text" @bind="PlayerNameFilter" @bind:event="oninput" />
+    </div>
+    <div>
+        <label>Количество игр</label>
+        <input type="text" @bind="GameCountFilter" @bind:event="oninput" />
+    </div>
+    <div>
+        <label>Количество побед</label>
+        <input type="text" @bind="WinCountFilter" @bind:event="oninput" />
+    </div>
+</div>
+<div class="filterblock">
+    <p>Отображать столбцы</p>
+    <div>
+        <label>Имя игрока</label>
+        <input type="checkbox" @bind="_playerNameVisible" />
+    </div>
+    <div>
+        <label>Количество игр</label>
+        <input type="checkbox" @bind="_gameCountVisible" />
+    </div>
+    <div>
+        <label>Количество побед</label>
+        <input type="checkbox" @bind="_winCountVisible" />
+    </div>
+</div>
+
+
+@if (_statLines == null || _statLines.Count() == 0) {
+    <p>Статистики на данный момент нет</p>
+} else {
+    <table style="grid-template-columns: @(_playerNameVisible ? "minmax(150px, 1fr)" : "") @(_gameCountVisible ? "minmax(150px, 1.67fr)" : "") @(_winCountVisible ? "minmax(150px, 1.67fr)" : "")">
+        <thead>
+            <tr>
+                @if (_playerNameVisible)
+                {
+                    <th>Имя игрока</th>
+                }
+                @if (_gameCountVisible)
+                {
+                    <th>Количество игр</th>
+                }
+                @if (_winCountVisible)
+                {
+                    <th>Количество побед</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var statLine in _statLines)
+            {
+                <tr>
+                    @if (_playerNameVisible)
+                    {
+                        <td>@(statLine.PlayerName)</td>
+                    }
+                    @if (_gameCountVisible)
+                    {
+                        <td>@(statLine.GamesCount)</td>
+                    }
+                    @if (_winCountVisible)
+                    {
+                        <td>@(statLine.WinCount)</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<StatLine>? _statLines;
+
+    private string _playerNameFilter = string.Empty;
+    private string PlayerNameFilter
+    {
+        get => _playerNameFilter;
+        set 
+        {
+            _playerNameFilter = value;
+            Redraw();
+        }
+    }
+    private string _gameCountFilter = string.Empty;
+    private string GameCountFilter
+    {
+        get => _gameCountFilter;
+        set
+        {
+            _gameCountFilter = value;
+            Redraw();
+        }
+    }
+    private string _winCountFilter = string.Empty;
+    private string WinCountFilter
+    {
+        get => _winCountFilter;
+        set
+        {
+            _winCountFilter = value;
+            Redraw();
+        }
+    }
+
+    private bool _playerNameVisible = true;
+    private bool _gameCountVisible = true;
+    private bool _winCountVisible = true;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _statLines = _statsService.GetStatistics(_playerNameFilter, _gameCountFilter, _winCountFilter);
+
+        _statsService.AddGameResult("test", "test2");
+    }
+
+    private void Redraw() 
+    {
+        _statLines = _statsService.GetStatistics(_playerNameFilter, _gameCountFilter, _winCountFilter);
+
+        InvokeAsync(() => StateHasChanged());
+    }
+}

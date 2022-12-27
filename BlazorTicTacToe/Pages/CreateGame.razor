@@ -1,0 +1,48 @@
+﻿@using BlazorTicTacToe.Data
+
+@page "/create-game"
+
+@inject AuthenticationStateProvider _authenticationProvider;
+@inject NavigationManager _navigationManager;
+@inject IGameFieldService _gameFieldService;
+@inject IGameRoomService _gameRoomService;
+
+@if (_isWaitingForSecondPlayer) {
+    <p>Ожидание второго игрока</p>
+}
+else
+{
+    <p>Выберите сторону:</p>
+    <div>
+        <button @onclick="async () => await ChooseSide(PlayerSign.Cross)">Крестик</button>
+        <button @onclick="async () => await ChooseSide(PlayerSign.Zero)">Нолик</button>
+    </div>
+}
+
+
+@code {
+    private bool _isWaitingForSecondPlayer = false;
+
+    private int roomId = 0;
+
+    private async Task ChooseSide(PlayerSign playerSign)
+    {
+        string playerName = (await _authenticationProvider.GetAuthenticationStateAsync())?.User?.Identity?.Name ?? string.Empty;
+        roomId = _gameRoomService.CreateRoom(playerName, playerSign);
+        _isWaitingForSecondPlayer = true;
+        _gameRoomService.RoomIsReady += RoomIsReadyEventHandler;
+        Redraw();
+    }
+
+    private void RoomIsReadyEventHandler(object? sender, RoomIsReadyEventArgs eventArgs)
+    {
+        _gameRoomService.RoomIsReady -= RoomIsReadyEventHandler;
+
+        if (eventArgs.RoomId == roomId)
+        {
+            _navigationManager.NavigateTo($"/game?room_id={eventArgs.RoomId}");
+        }
+    }
+
+    private void Redraw() => InvokeAsync(() => StateHasChanged());
+}

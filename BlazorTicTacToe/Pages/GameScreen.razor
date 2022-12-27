@@ -1,0 +1,144 @@
+﻿@page "/game"
+@using BlazorTicTacToe.Data
+@using System.Security.Claims
+
+@implements IDisposable
+
+@inject AuthenticationStateProvider _authenticationProvider;
+@inject IGameRoomService _gameRoomService;
+@inject IGameFieldService _gameFieldService;
+
+<style>
+    div .game_field {
+        width: 50vw;
+        height: 50vw;
+        background: grey;
+        display: inline-grid;
+        grid-template-columns: repeat(10, auto);
+        grid-gap:2px;
+        border: 2px solid grey;
+        position:center;
+    }
+
+    div .game_field_item {
+        width: 100%;
+        height: 100%;
+        background: #eeeeee;
+        display: inline-block;
+    }
+
+    div .game_field_item.cross {
+        background: #eeeeee url("cross.png") no-repeat center;
+    }
+
+    div .game_field_item.zero {
+        background: #eeeeee url("zero.png") no-repeat center;
+    }
+
+    div .game_field_item.win {
+        background-color: limegreen;
+    }
+</style>
+
+@if (RoomId == null) {
+    <p>Не указан идентификатор игры</p>
+}
+else {
+    <div style="width:100%;display:block">
+        <div>
+            <div class="game_field">
+                @{
+                    FieldSign[,] GameField = _gameRoom.GetGameScreen();
+
+                    const int gameFieldLength = 10;
+
+                    for (int rowId = 0; rowId < gameFieldLength; rowId++)
+                    {
+                        for (int cold = 0; cold < gameFieldLength; cold++)
+                        {
+                            int col = cold;
+                            int row = rowId;
+
+                            FieldSign playerSign = GameField[col, row];
+
+                            bool isWinPoint = _winPoints?.FirstOrDefault(x => x.Item1 == col && x.Item2 == row) != null;
+
+                            <div id="game_field_item_@(cold)_@(rowId)" class="game_field_item @(GetFieldSignCssClass(playerSign)) @(isWinPoint ? "win" : "")" @onclick="async () => await PutSign(col, row)"></div>
+                        }
+                    }
+                }
+            </div>
+            @if (_gameRoom.CurrentSignTurn != null)
+            {
+                <p>Сейчас ходит: @(_gameRoom.CurrentSignTurn == PlayerSign.Cross ? "крестик" : "нолик")</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "room_id")]
+    public int? RoomId { get; set; }
+
+    private GameRoom _gameRoom;
+
+    private string _playerName;
+
+    private PlayerSign? WinnerSign { get; set; }
+
+    private Tuple<int, int>[]? _winPoints;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _playerName = _authenticationProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult()?.User?.Identity?.Name;
+
+        if (RoomId != null)
+        {
+            _gameRoom = _gameRoomService?.GetGameRoomById(RoomId.Value);
+        }
+
+        _gameRoom.PlayerSignAdded += RedrawEventHandler;
+        _gameRoom.PlayerWin += PlayerWinEventHandler;
+    }
+
+    private async Task PutSign(int colId, int rowId) =>
+        _gameRoom.PutSignOnField(colId, rowId, (await _authenticationProvider.GetAuthenticationStateAsync()).User.Identity.Name);
+
+    private string GetFieldSignCssClass(FieldSign playerSign) {
+        switch (playerSign)
+        {
+            case FieldSign.Empty:
+                return "empty";
+            case FieldSign.Cross:
+                return "cross";
+            case FieldSign.Zero:
+                return "zero";
+            default:
+                throw new NotSupportedException(playerSign.ToString());
+        }
+    }
+
+    private void PlayerWinEventHandler(object? sender, PlayerWinEventArgs eventArgs)
+    {
+        WinnerSign = eventArgs.WinnerSign;
+        _winPoints = eventArgs.WinPoints;
+
+        _gameRoomService?.CloseRoom(RoomId ?? 0);
+
+        Redraw();
+    }
+
+    private void RedrawEventHandler(object? sender, PlayerSignAddedEventArgs eventArgs) => Redraw();
+
+    private void Redraw() => InvokeAsync(() => StateHasChanged());
+
+    public void Dispose()
+    {
+        _gameRoom.PlayerSignAdded -= RedrawEventHandler;
+
+        _gameRoom.PlayerWin -= PlayerWinEventHandler;
+    }
+}

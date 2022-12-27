@@ -1,0 +1,46 @@
+﻿@page "/select-game";
+
+@using BlazorTicTacToe.Data
+
+@inject AuthenticationStateProvider _authenticationProvider;
+@inject IGameRoomService _gameRoomService;
+@inject NavigationManager _navigationManager;
+
+<h3>Выбор игры</h3>
+
+@{
+    var gameRooms = _gameRoomService.GetActiveRooms().ToArray();
+
+    if (gameRooms.Length == 0) {
+        <p>Свободных игр нет</p>
+    } else {
+        foreach (var gameRoom in gameRooms)
+        {
+            <div>
+                <button @onclick="() => JoinRoom(gameRoom.Id)">
+                    <p>Комната @(gameRoom.Id)</p>
+                    <p>Создатель: @(gameRoom.CreatorName)</p>
+                    <p>Выбрал @(gameRoom.CreatorSign == PlayerSign.Cross ? "крестик" : "нолик")</p>
+                </button>
+            </div>
+        }
+    }
+}
+
+@code {
+    private void JoinRoom(int roomId)
+    {
+        var room = _gameRoomService.GetGameRoomById(roomId);
+        if (room == null)
+        {
+            return;
+        }
+
+        var playerName = _authenticationProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult()?.User?.Identity?.Name ?? string.Empty;
+        var playerSign = room.CreatorSign == PlayerSign.Cross ? PlayerSign.Zero : PlayerSign.Cross;
+
+        _gameRoomService.JoinRoom(roomId, playerName, playerSign);
+
+        _navigationManager.NavigateTo($"/game?room_id={roomId}");
+    }
+}
